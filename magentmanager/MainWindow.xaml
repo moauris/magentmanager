@@ -1,0 +1,54 @@
+﻿<Window x:Class="magentmanager.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:magentmanager"
+        mc:Ignorable="d"
+        Title="ジョブコン Control/M-Agent依頼管理運用 ツール" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="10*"/>
+            <RowDefinition Height="11*"/>
+            <RowDefinition Height="58*"/>
+            <RowDefinition Height="29"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="40*"/>
+            <ColumnDefinition Width="50*"/>
+            <ColumnDefinition Width="307*"/>
+        </Grid.ColumnDefinitions>
+        <Button x:Name="btnNewRequest"
+                Grid.Row="1" Grid.Column="1"
+                Margin="4,4.4,4,3.8"
+                Click="btnNewRequest_Clicked">
+            新規依頼受付
+        </Button>
+        <StatusBar Height="26" VerticalAlignment="Bottom" 
+                   Margin="0,0,0,0" Grid.Row="3"
+                   Grid.ColumnSpan="3">
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                    
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem x:Name="sbarTextBox" Content="Status: Ready." Grid.Column="0"/>
+            <Separator Width="1" Grid.Column="1"/>
+            <Separator Width="1" Grid.Column="3"/>
+            <StatusBarItem Grid.Column="4">
+                <ProgressBar x:Name="sbarProgress"
+                             Width="240" Height="17"/>
+            </StatusBarItem>
+
+        </StatusBar>
+    </Grid>
+</Window>
