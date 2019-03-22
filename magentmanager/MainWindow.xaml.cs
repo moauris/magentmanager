@@ -32,14 +32,35 @@ namespace magentmanager
         private async void btnNewRequest_Clicked(object sender, RoutedEventArgs e)
         {
             FileInfo[] TargetExcelFiles = await NewTask.TaskNewFileOpen();
-            //Debug.Print("FileName is : " + TargetExcelFiles.FullName);
-            sbarProgress.IsIndeterminate = true;
-            sbarTextBox.Content = "Status: Processing New Request.";
+            var updatePbar = new Progress<bool>(RunningProgress);
+            var ProgressHandler = updatePbar as IProgress<bool>;
+            
             if (TargetExcelFiles[0].Name != "null")
-                await NewTask.TaskExcelToDatabase(TargetExcelFiles);
+                await Task.Run(() => NewTask.TaskExcelToDatabase
+                    (TargetExcelFiles, ProgressHandler)); 
+            //If the use Task type instead of void, progress bar will not update.
+            
+            //sbarProgress.Value = 100; sbarTextBox.Content = "Status: Ready.";
+            //sbarProgress.IsIndeterminate = false; sbarProgress.Value = 0;
+        }
 
-            sbarProgress.Value = 100; sbarTextBox.Content = "Status: Ready.";
-            sbarProgress.IsIndeterminate = false; sbarProgress.Value = 0;
+        public void RunningProgress(bool IsRunning)
+        {
+            
+            if (IsRunning)
+            {
+                Debug.Print("Started Progress Run");
+                sbarProgress.IsIndeterminate = true;
+                
+                sbarTextBox.Content = "Status: Executing";
+                //Debug.Print("sbarProgress.IsIndeterminate: " + sbarProgress.IsIndeterminate);
+            }
+            else
+            {
+                Debug.Print("Finished Run");
+                sbarTextBox.Content = "Status: Ready";
+                sbarProgress.IsIndeterminate = false; sbarProgress.Value = 0;
+            }
         }
     }
 }
