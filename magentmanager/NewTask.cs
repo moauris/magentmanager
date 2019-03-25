@@ -11,6 +11,8 @@ using System.Data.OleDb;
 using System.Data;
 using System.Collections;
 using System.Linq;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace magentmanager
 {
@@ -60,7 +62,7 @@ namespace magentmanager
             return Task.FromResult(listFiles.ToArray());
         }
 
-        //Sync Excel File to a Database.
+        //Sync Excel File to a XML.
         internal static async void TaskExcelToDatabase
             (FileInfo[] xlFiles, IProgress<bool> OnProgressChanged)
         {
@@ -94,7 +96,15 @@ namespace magentmanager
                     ValidExcel validExcel = new ValidExcel(xlSheet);
                     if (validExcel.IsValid)
                     {
-                        await MainExcelToDatabase(f, xlSheet);
+                        try
+                        {
+                            await ExcelToXML(f, xlSheet);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.Print(ex.Message);
+                            Debug.Print(ex.StackTrace);
+                        }
                     }
                     else
                     {
@@ -116,6 +126,85 @@ namespace magentmanager
             await Task.Run(() => CurrentExcelProcess.Kill());
             await Task.Run(() => OnProgressChanged.Report(false));
         }
+
+        private static async Task ExcelToXML(FileInfo ExcelFile, EXCEL.Worksheet xlSheet)
+        {
+            //throw new NotImplementedException();
+            XElement xeRoot = new XElement("NewRequest");
+            xeRoot.Add(new XElement("xlname", ExcelFile.Name));
+            EXCEL.Range SyncRange = null;
+            void SyncRangeToXML(string Address)
+            {
+                try
+                {
+                    SyncRange = xlSheet.Range[Address];
+                    XElement xRange = new XElement(string.Format("R_{0}"
+                        , SyncRange.Address.Replace("$", "")));
+                    xRange.Add(new XAttribute("Type", "xlRange"));
+                    xRange.Add(new XAttribute("CellAddress", SyncRange.Address));
+                    xRange.Add(new XAttribute("CellValue", SyncRange.Value));
+
+                    xeRoot.Add(xRange);
+                }
+                catch (Exception)
+                {
+                    Debug.Print(Address + " Cannot sync to XML.");
+                }
+            }
+            // Sync CheckBoxes
+            await Task.Run(() =>
+            {
+                IEnumerable<EXCEL.Shape> xlCheckboxes =
+                    from EXCEL.Shape s in xlSheet.Shapes
+                    where Regex.IsMatch(s.Name, @"(チェック|Check)")
+                    && s.OLEFormat.Object.Value == 1
+                    select s;
+                foreach (EXCEL.Shape s in xlCheckboxes)
+                {
+                    XElement xCheckbox = new XElement(string.Format("C_{0}"
+                        , s.TopLeftCell.Address.Replace("$", "")));
+                    xCheckbox.Add(new XAttribute("Type", "CheckBox"));
+                    xCheckbox.Add(new XAttribute("CellAddress", s.TopLeftCell.Address));
+                    xCheckbox.Add(new XAttribute("CellValue", s.TopLeftCell.Offset[0, 1].Value));
+                    xeRoot.Add(xCheckbox);
+                }
+
+            });
+            //foreach (EXCEL.Shape s in xlSheet.Shapes)
+            //{
+            //    Debug.Print(s.Name);
+            //}
+            await Task.Run(() =>
+            {
+                IEnumerable<EXCEL.Shape> xlTextboxes =
+                    from EXCEL.Shape s in xlSheet.Shapes
+                    where Regex.IsMatch(s.Name, @"TextBox1(3|4|5)")
+                    select s;
+                foreach (EXCEL.Shape s in xlTextboxes)
+                {
+                    XElement xTextBox = new XElement(string.Format(s.Name
+                        , s.TopLeftCell.Address.Replace("$", "")));
+                    xCheckbox.Add(new XAttribute("Type", "CheckBox"));
+                    xCheckbox.Add(new XAttribute("CellAddress", s.TopLeftCell.Address));
+                    xCheckbox.Add(new XAttribute("CellValue", s.TopLeftCell.Offset[0, 1].Value));
+                    xeRoot.Add(xCheckbox);
+
+                }
+            });
+            for (int i = 7; i <= 11; i++)
+                SyncRangeToXML("$H$" + i);
+            for (int i = 32; i <= 100; i++)
+                SyncRangeToXML("$H$" + i);
+            for (int i = 32; i <= 100; i++)
+                SyncRangeToXML("$L$" + i);
+            for (int i = 32; i <= 100; i++)
+                SyncRangeToXML("$P$" + i);
+            SyncRangeToXML("$E$161");
+
+            Debug.Print (xeRoot.ToString());
+            //Perfect, it gets the Values.
+        }
+
         //
         // Summary:
         //     Check if a Request already existed in the database.
@@ -146,12 +235,118 @@ namespace magentmanager
             //throw new NotImplementedException();
             await Task.Run(() => Debug.Print(xlSheet
                 .Range["$H$51"].Value as string));
-            OleDbConnection conn = DatabaseConnection();
-            conn.StateChange += (object sender, StateChangeEventArgs e)
-                => Debug.Print(string.Format
-                ("Database Status Changed from {0} to {1}."
-                , e.OriginalState, e.CurrentState));
-            conn.Open();
+            using (OleDbConnection conn = DatabaseConnection())
+            {
+                conn.StateChange += (object sender, StateChangeEventArgs e)
+                    => Debug.Print(string.Format
+                    ("Database Status Changed from {0} to {1}."
+                    , e.OriginalState, e.CurrentState));
+                OleDbCommand INSERT_Host = new OleDbCommand();
+                OleDbTransaction TransAll = null;
+                try
+                {
+                    conn.Open();
+                    TransAll = conn.BeginTransaction(IsolationLevel.ReadCommitted);
+                    //Otherwise it throws the connection waiting for a local Transaction error
+                    INSERT_Host.Connection = conn;
+                    INSERT_Host.Transaction = TransAll;
+                    Regex ValidHostname = 
+                        new Regex(@"(\w|\d){8,}\.?");
+                    //Is there Value to be synced at H49:K50, VIP, C1
+                    string C1VIP = xlSheet.Range["$H$49"].Value;
+                    Match mhValidHost = ValidHostname.Match(C1VIP);
+                    if (mhValidHost.Success)
+                    {
+                        INSERT_Host.CommandText =File.ReadAllText(SQLFolder + "INSERTHost.sql");
+                        INSERT_Host.Parameters.AddWithValue("@ostname", C1VIP);
+                        INSERT_Host.Parameters.AddWithValue("@PAddress", xlSheet.Range["$H$50"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@aker", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@odel", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@PUCount", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@S", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@ersion", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@itVal", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@lusterBox", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@lusterIndex", "VIP");
+                        INSERT_Host.ExecuteNonQuery();
+                    }
+                    string C2VIP = xlSheet.Range["$L$49"].Value;
+                    mhValidHost = ValidHostname.Match(C2VIP);
+                    if (mhValidHost.Success)
+                    {
+                        INSERT_Host.CommandText = File.ReadAllText(SQLFolder + "INSERTHost.sql");
+                        INSERT_Host.Parameters.AddWithValue("@ostname", C2VIP);
+                        INSERT_Host.Parameters.AddWithValue("@PAddress", xlSheet.Range["$L$50"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@aker", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@odel", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@PUCount", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@S", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@ersion", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@itVal", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@lusterBox", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@lusterIndex", "VIP");
+                        INSERT_Host.ExecuteNonQuery();
+                    }
+                    string C3VIP = xlSheet.Range["$P$49"].Value;
+                    mhValidHost = ValidHostname.Match(C3VIP);
+                    if (mhValidHost.Success)
+                    {
+                        INSERT_Host.CommandText = File.ReadAllText(SQLFolder + "INSERTHost.sql");
+                        INSERT_Host.Parameters.AddWithValue("@ostname", C3VIP);
+                        INSERT_Host.Parameters.AddWithValue("@PAddress", xlSheet.Range["$P$50"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@aker", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@odel", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@PUCount", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@S", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@ersion", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@itVal", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@lusterBox", "VIP");
+                        INSERT_Host.Parameters.AddWithValue("@lusterIndex", "VIP");
+                        INSERT_Host.ExecuteNonQuery();
+                    }
+                    string C1PRI = xlSheet.Range["$H$51"].Value;
+                    mhValidHost = ValidHostname.Match(C1PRI);
+                    if (mhValidHost.Success)
+                    {
+                        INSERT_Host.CommandText = File.ReadAllText(SQLFolder + "INSERTHost.sql");
+                        INSERT_Host.Parameters.AddWithValue("@ostname", C1PRI);
+                        INSERT_Host.Parameters.AddWithValue("@PAddress", xlSheet.Range["$H$52"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@aker", xlSheet.Range["$H$53"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@odel", xlSheet.Range["$H$54"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@PUCount", xlSheet.Range["$H$55"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", xlSheet.Range["$H$56"].Value);
+                        //Getting Check Box Info $H$57:$K$59
+                        IEnumerable<EXCEL.Range> ieCheckBoxValue =
+                            from EXCEL.Shape s in xlSheet.Shapes
+                            where Regex.IsMatch(s.TopLeftCell.Address, @"^\$(H|K)\$5(7-9)$")
+                            && s.OLEFormat.Object.Value == 1
+                            && s.Name.Contains("Check Box")
+                            select s.TopLeftCell.Offset[0, 1];
+
+                        INSERT_Host.Parameters.AddWithValue("@S", ieCheckBoxValue.First().Value);
+                        INSERT_Host.Parameters.AddWithValue("@ersion", xlSheet.Range["$H$60"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@itVal", xlSheet.Range["$H$61"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@lusterBox", xlSheet.Range["$H$62"].Value);
+                        INSERT_Host.Parameters.AddWithValue("@lusterIndex", xlSheet.Range["$H$63"].Value);
+                        INSERT_Host.ExecuteNonQuery();
+                    }
+                    TransAll.Commit();
+                    Debug.Print("Sync Completed.");
+
+                }
+                catch(Exception ex)
+                {
+
+                    Debug.Print("An Error Happened, Rolling Back.");
+                    
+                    Debug.Print(ex.Message);
+                    Debug.Print(ex.StackTrace);
+                    TransAll.Rollback();
+                }
+            }
 
             /*
             string strSQL = File.ReadAllText(SQLFolder 
@@ -167,7 +362,6 @@ namespace magentmanager
             {
                 Debug.Print(ex.Message);
             }*/
-            conn.Close();
         }
     }
 }
