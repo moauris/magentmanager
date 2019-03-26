@@ -100,7 +100,6 @@ namespace magentmanager
                         try
                         {
                             await ExcelToXML(f, xlSheet);
-                            await XMLToDatabase();
                         }
                         catch (Exception ex)
                         {
@@ -126,6 +125,16 @@ namespace magentmanager
             GC.Collect();
             Console.Beep(1250, 50); Console.Beep(1650, 75);
             await Task.Run(() => CurrentExcelProcess.Kill());
+
+            try
+            {
+                await XMLToDatabase();
+            }
+            catch(Exception ex)
+            {
+                Debug.Print(ex.StackTrace);
+            }
+            
             await Task.Run(() => OnProgressChanged.Report(false));
         }
 
@@ -138,7 +147,60 @@ namespace magentmanager
             await Task.Run(() =>
             {
                 XElement xRequest = XElement.Load(xFile.FullName);
-                Debug.Print(xRequest.ToString());
+                //Debug.Print(xRequest.ToString());
+
+                //string Method, Input Address $H$51, 
+                //return value
+                string xRange(string Address)
+                {
+                    IEnumerable<XElement> ieFilter =
+                        from XElement x in xRequest.Elements()
+                        where x.HasAttributes
+                        select x;
+                    IEnumerable<string> ieRangeVal =
+                        from XElement x in ieFilter
+                        where x.Attribute("CellAddress").Value == Address
+                        && x.Attribute("Type").Value == "xlRange"
+                        select x.Attribute("CellValue").Value;
+                    int FoundNode = ieRangeVal.Count();
+                    if (FoundNode != 1)
+                        return "未入力";
+                    return ieRangeVal.First();
+                }
+                //string Method, Input Checkbox Area $H$42:$K$43
+                string xCheck(string Address)
+                {
+                    Match mValid = Regex.Match(Address
+                        , @"^\$[A-Z]\$\d+:\$[A-Z]\$\d+$");
+                    if (!mValid.Success)
+                        throw new Exception(Address + " is not a valid Cell Address Area.");
+                    Regex rxExtract = new Regex(
+                        @"^\$(?'CStart'[A-Z])\$(?'RStart'\d+):\$(?'CEnd'[A-Z])\$(?'REnd'\d+)$");
+                    char CStart, CEnd;
+                    int RStart, REnd;
+                    CStart = rxExtract.Matches(Address)[0].Groups["CStart"].Value.ToCharArray()[0];
+                    RStart = int.Parse(rxExtract.Matches(Address)[0].Groups["RStart"].Value);
+                    CEnd = rxExtract.Matches(Address)[0].Groups["CEnd"].Value.ToCharArray()[0];
+                    REnd = int.Parse(rxExtract.Matches(Address)[0].Groups["REnd"].Value);
+                    string result = "";
+                    for (char c = CStart; c <= CEnd; c++)
+                    {
+                        for (int i = RStart; i <= CEnd; i++)
+                        {
+                            string AddressRange = string.Format("${0}${1}", c, i);
+                            result += AddressRange + ";";
+                        }
+                    }
+
+                    return result;
+                }
+                Debug.Print(xRange("$H$8"));
+                Debug.Print(xRange("$H$32"));
+                Debug.Print(xRange("$H$33"));
+                Debug.Print(xRange("$H$337"));
+                Debug.Print(xCheck("$H$25:$L$57"));
+
+
             });
 
             
