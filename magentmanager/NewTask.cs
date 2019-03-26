@@ -13,6 +13,7 @@ using System.Collections;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using System.Xml;
 
 namespace magentmanager
 {
@@ -99,6 +100,7 @@ namespace magentmanager
                         try
                         {
                             await ExcelToXML(f, xlSheet);
+                            await XMLToDatabase();
                         }
                         catch (Exception ex)
                         {
@@ -122,9 +124,24 @@ namespace magentmanager
             xlWorkbooks.Close();
             xlApp.Quit();
             GC.Collect();
-            Console.Beep(750, 50);
+            Console.Beep(1250, 50); Console.Beep(1650, 75);
             await Task.Run(() => CurrentExcelProcess.Kill());
             await Task.Run(() => OnProgressChanged.Report(false));
+        }
+
+        private static async Task XMLToDatabase()
+        {
+            //throw new NotImplementedException();
+            FileInfo xFile = new FileInfo("Request_Definition.xml");
+            if (!xFile.Exists) throw new Exception("XML File not exist.");
+
+            await Task.Run(() =>
+            {
+                XElement xRequest = XElement.Load(xFile.FullName);
+                Debug.Print(xRequest.ToString());
+            });
+
+            
         }
 
         private static async Task ExcelToXML(FileInfo ExcelFile, EXCEL.Worksheet xlSheet)
@@ -168,29 +185,8 @@ namespace magentmanager
                     xCheckbox.Add(new XAttribute("CellValue", s.TopLeftCell.Offset[0, 1].Value));
                     xeRoot.Add(xCheckbox);
                 }
-
             });
-            //foreach (EXCEL.Shape s in xlSheet.Shapes)
-            //{
-            //    Debug.Print(s.Name);
-            //}
-            await Task.Run(() =>
-            {
-                IEnumerable<EXCEL.Shape> xlTextboxes =
-                    from EXCEL.Shape s in xlSheet.Shapes
-                    where Regex.IsMatch(s.Name, @"TextBox1(3|4|5)")
-                    select s;
-                foreach (EXCEL.Shape s in xlTextboxes)
-                {
-                    XElement xTextBox = new XElement(string.Format(s.Name
-                        , s.TopLeftCell.Address.Replace("$", "")));
-                    xCheckbox.Add(new XAttribute("Type", "CheckBox"));
-                    xCheckbox.Add(new XAttribute("CellAddress", s.TopLeftCell.Address));
-                    xCheckbox.Add(new XAttribute("CellValue", s.TopLeftCell.Offset[0, 1].Value));
-                    xeRoot.Add(xCheckbox);
 
-                }
-            });
             for (int i = 7; i <= 11; i++)
                 SyncRangeToXML("$H$" + i);
             for (int i = 32; i <= 100; i++)
@@ -199,9 +195,11 @@ namespace magentmanager
                 SyncRangeToXML("$L$" + i);
             for (int i = 32; i <= 100; i++)
                 SyncRangeToXML("$P$" + i);
+
             SyncRangeToXML("$E$161");
 
-            Debug.Print (xeRoot.ToString());
+            File.WriteAllText("Request_Definition.xml", xeRoot.ToString());
+            Debug.Print ("File written Request_Definition.xml.");
             //Perfect, it gets the Values.
         }
 
