@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Xml;
+using ControlMAgent.Base;
 
 namespace magentmanager
 {
@@ -123,7 +124,7 @@ namespace magentmanager
             xlWorkbooks.Close();
             xlApp.Quit();
             GC.Collect();
-            Console.Beep(1250, 50); Console.Beep(1650, 75);
+            Console.Beep(1250, 20); Console.Beep(1650, 75);
             await Task.Run(() => CurrentExcelProcess.Kill());
 
             try
@@ -170,6 +171,7 @@ namespace magentmanager
                 //string Method, Input Checkbox Area $H$42:$K$43
                 string xCheck(string Address)
                 {
+                    /*
                     Match mValid = Regex.Match(Address
                         , @"^\$[A-Z]\$\d+:\$[A-Z]\$\d+$");
                     if (!mValid.Success)
@@ -182,28 +184,115 @@ namespace magentmanager
                     RStart = int.Parse(rxExtract.Matches(Address)[0].Groups["RStart"].Value);
                     CEnd = rxExtract.Matches(Address)[0].Groups["CEnd"].Value.ToCharArray()[0];
                     REnd = int.Parse(rxExtract.Matches(Address)[0].Groups["REnd"].Value);
-                    string result = "";
+                    //Debug.Print("CStart={0};CEnd={1};RStart={2};REnd={3}"
+                    //    , CStart, CEnd, RStart, REnd);
+                    string AddressRange = "";
                     for (char c = CStart; c <= CEnd; c++)
                     {
-                        for (int i = RStart; i <= CEnd; i++)
+                        for (int i = RStart; i <= REnd; i++)
                         {
-                            string AddressRange = string.Format("${0}${1}", c, i);
-                            result += AddressRange + ";";
+                            string thisRange = string.Format("${0}${1}", c, i);
+                            AddressRange += thisRange + ";";
                         }
                     }
-
-                    return result;
+                    */
+                    //$H$25;$H$26;$H$27;...$L$74;$L$75;$L$76;
+                    CellAddresses TargetCellArea =
+                    new CellAddresses(Address);
+                    string AddressRange = TargetCellArea.FullAddress();
+                    //Check if any of that is in the 
+                    IEnumerable<XElement> ieFilter =
+                        from XElement x in xRequest.Elements()
+                        where x.HasAttributes
+                        select x;
+                    //Debug.Print(AddressRange);
+                    IEnumerable<string> ieCheckVal =
+                        from XElement x in ieFilter
+                        where AddressRange.Contains(x.Attribute("CellAddress").Value)
+                            && x.Attribute("Type").Value == "CheckBox"
+                        select x.Attribute("CellValue").Value;
+                    int ValueFound = ieCheckVal.Count();
+                    switch (ValueFound)
+                    {
+                        case 0:
+                            return "未入力";
+                        case 1:
+                            return ieCheckVal.First();
+                        default:
+                            return "無効な入力";
+                    }
                 }
-                Debug.Print(xRange("$H$8"));
-                Debug.Print(xRange("$H$32"));
-                Debug.Print(xRange("$H$33"));
-                Debug.Print(xRange("$H$337"));
-                Debug.Print(xCheck("$H$25:$L$57"));
+                // Get Cell Value: xRange("$H$8"));
+                // Get Checkbox Value: xCheck("$H$34:$K$36"));
+                // Connect to the Database and sync it
+                using (OleDbConnection conn = DatabaseConnection())
+                {
+                    conn.StateChange += (object sender, StateChangeEventArgs e)
+                        => Debug.Print("Database Status Changed from {0} to {1}"
+                        , e.OriginalState, e.CurrentState);
+                    OleDbCommand INSERT_Host = new OleDbCommand();
+                    OleDbTransaction TransactAll = null;
+                    try
+                    {
+                        conn.Open();
+                        TransactAll = conn.BeginTransaction(IsolationLevel.ReadCommitted);
+                        INSERT_Host.Connection = conn;
+                        INSERT_Host.Transaction = TransactAll;
+                        //Command is ready.
+                        
+                        void MakeCommandforMA(string StartAddress)
+                        {
+                            Regex ValidHostname = new Regex(@"(\w|\d){8,}\.?");
+                            CellAddress caStart = new CellAddress(StartAddress);
+                            string C1VIP = xRange(caStart.FullAddress());
+                            Match mhValidHost = ValidHostname.Match(C1VIP);
+                            if (mhValidHost.Success)
+                            {
+                                INSERT_Host.CommandText = File.ReadAllText(SQLFolder + "INSERTHost.sql");
+                                INSERT_Host.Parameters.AddWithValue("@ostname", C1VIP);
+                                INSERT_Host.Parameters.AddWithValue("@PAddress", xRange(caStart.NextRow));
+                                if (caStart.IsVIP)
+                                {
+                                    INSERT_Host.Parameters.AddWithValue("@aker", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@odel", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@PUCount", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@S", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@ersion", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@itVal", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@lusterBox", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@lusterIndex", "VIP");
+                                }
+                                else
+                                {
+                                    INSERT_Host.Parameters.AddWithValue("@aker", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@odel", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@PUCount", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@S", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@ersion", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@itVal", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@lusterBox", "VIP");
+                                    INSERT_Host.Parameters.AddWithValue("@lusterIndex", "VIP");
+
+                                }
+                                INSERT_Host.ExecuteNonQuery();
+
+                            }
+                        }
+
+                        MakeCommandforMA("$H$49");
+
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+
+                }
 
 
             });
-
-            
         }
 
         private static async Task ExcelToXML(FileInfo ExcelFile, EXCEL.Worksheet xlSheet)
@@ -260,6 +349,7 @@ namespace magentmanager
 
             SyncRangeToXML("$E$161");
 
+            //Debug.Print(xeRoot.ToString());
             File.WriteAllText("Request_Definition.xml", xeRoot.ToString());
             Debug.Print ("File written Request_Definition.xml.");
             //Perfect, it gets the Values.
@@ -319,17 +409,6 @@ namespace magentmanager
                     {
                         INSERT_Host.CommandText =File.ReadAllText(SQLFolder + "INSERTHost.sql");
                         INSERT_Host.Parameters.AddWithValue("@ostname", C1VIP);
-                        INSERT_Host.Parameters.AddWithValue("@PAddress", xlSheet.Range["$H$50"].Value);
-                        INSERT_Host.Parameters.AddWithValue("@aker", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@odel", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@PUCount", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@PUMicroprocessor", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@S", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@ersion", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@itVal", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@lusterBox", "VIP");
-                        INSERT_Host.Parameters.AddWithValue("@lusterIndex", "VIP");
-                        INSERT_Host.ExecuteNonQuery();
                     }
                     string C2VIP = xlSheet.Range["$L$49"].Value;
                     mhValidHost = ValidHostname.Match(C2VIP);
@@ -424,5 +503,6 @@ namespace magentmanager
             }*/
         }
     }
+
 }
  
