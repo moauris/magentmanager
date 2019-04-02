@@ -43,9 +43,7 @@ namespace magentmanager
             //Valid = true, not valid = false
             bool Check_H51 = xlSheet.Range["$H$51"].Value == null?
                 false : rex.IsMatch(xlSheet.Range["$H$51"].Value);
-
             bool Check_H84 = !(xlSheet.Range["$H$84"].Value == null);
-
             bool Check_H98 = !(xlSheet.Range["$H$98"].Value == null);
 
             StringBuilder sbMessage = new StringBuilder();

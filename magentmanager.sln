@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.28307.329
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "magentmanager", "magentmanager\magentmanager.csproj", "{30FDAA4E-C11A-46C8-90EE-804AB0F631C4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MAgent", "CellAddress\MAgent.csproj", "{4FE39818-18A9-4754-9BCB-947C64BFA863}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlMAgent.Base", "..\ControlMAgent.Base\ControlMAgent.Base\ControlMAgent.Base.csproj", "{27205917-DF7E-4438-A8A2-0752FB107902}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +17,10 @@ Global
 		{30FDAA4E-C11A-46C8-90EE-804AB0F631C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{30FDAA4E-C11A-46C8-90EE-804AB0F631C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{30FDAA4E-C11A-46C8-90EE-804AB0F631C4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{4FE39818-18A9-4754-9BCB-947C64BFA863}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4FE39818-18A9-4754-9BCB-947C64BFA863}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4FE39818-18A9-4754-9BCB-947C64BFA863}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4FE39818-18A9-4754-9BCB-947C64BFA863}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27205917-DF7E-4438-A8A2-0752FB107902}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27205917-DF7E-4438-A8A2-0752FB107902}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27205917-DF7E-4438-A8A2-0752FB107902}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27205917-DF7E-4438-A8A2-0752FB107902}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
