@@ -152,6 +152,31 @@ namespace magentmanager
 
                 //string Method, Input Address $H$51, 
                 //return value
+                DateTime xDate(string Address)
+                {
+                    IEnumerable<XElement> ieFilter =
+                        from XElement x in xRequest.Elements()
+                        where x.HasAttributes
+                        select x;
+                    IEnumerable<string> ieRangeVal =
+                        from XElement x in ieFilter
+                        where x.Attribute("CellAddress").Value == Address
+                        && x.Attribute("Type").Value == "xlRange"
+                        select x.Attribute("CellValue").Value;
+                    int FoundNode = ieRangeVal.Count();
+                    if (FoundNode != 1)
+                        return DateTime.Parse("1900-01-01");
+                    string DateString = ieRangeVal.First();
+                    bool IsDate = DateTime.TryParse(DateString, out DateTime result);
+                    if (IsDate)
+                    {
+                        return result;
+                    }
+                    else
+                    {
+                        return DateTime.Parse("1900-01-01");
+                    }
+                }
                 string xRange(string Address)
                 {
                     IEnumerable<XElement> ieFilter =
@@ -206,13 +231,19 @@ namespace magentmanager
                         => Debug.Print("Database Status Changed from {0} to {1}"
                         , e.OriginalState, e.CurrentState);
                     OleDbCommand INSERT_Host = new OleDbCommand();
+                    OleDbCommand INSERT_Excel = new OleDbCommand();
+                    OleDbCommand INSERT_Agent = new OleDbCommand();
+
                     OleDbTransaction TransactAll = null;
                     conn.Open();
                     TransactAll = conn.BeginTransaction(IsolationLevel.ReadCommitted);
                     INSERT_Host.Connection = conn;
                     INSERT_Host.Transaction = TransactAll;
+                    INSERT_Excel = INSERT_Agent = INSERT_Host.Clone();
+
                     //Make 3 Commands, one for each column
-                    void MakeCommandforMA(string StartAddress)
+                    //return value is rows affected.
+                    int MakeCommandForServer(string StartAddress)
                     {
                         Regex ValidHostname = new Regex(@"(\w|\d){8,}\.?");
                         CellRange caStart = new CellRange(StartAddress);
@@ -248,24 +279,142 @@ namespace magentmanager
                                 INSERT_Host.Parameters.AddWithValue("@lusterIndex", xRange(caStart.NextRow())); 
 
                             }
+                            //Debug.Print("Parameters Before Clear: {0}", INSERT_Host.Parameters.Count);
                             int RowsAffected = INSERT_Host.ExecuteNonQuery();
-                            Debug.Print("Parameters Before Clear: {0}", INSERT_Host.Parameters.Count);
                             INSERT_Host.Parameters.Clear();
-                            Debug.Print("Parameters After Clear: {0}", INSERT_Host.Parameters.Count);
-                            Debug.Print("Inserting into MAgent! {0} RowsAffected affected", RowsAffected);
-
+                            return RowsAffected;
                         }
+                        return 0;
+                    }
+                    int MakeCommandforAgent(char column)
+                    {
+                        if (!char.IsLetter(column))
+                            throw new Exception("Invalid Column Character");
+                        Regex ValidHostname = new Regex(@"(\w|\d){8,}\.?");
+
+                        INSERT_Agent.CommandText = File.ReadAllText(SQLFolder + "INSERTAgent.sql");
+                        //Agent Name is like uny40310.abc00101
+                        //If VIP Exist, use VIP; If VIP not exist, use Pri
+                        //Validate VIP At 49, and PRI at 51
+                        string magentName = "";
+                        string tempRange = string.Format(@"${0}$49", column);
+                        if (ValidHostname.IsMatch(xRange(tempRange)))
+                            magentName = xRange(tempRange);
+                        tempRange = string.Format(@"${0}$51", column);
+                        if (ValidHostname.IsMatch(xRange(tempRange)))
+                            magentName = xRange(tempRange);
+                        if(magentName == "")
+                            throw new Exception("Invalid MA Column, magentName Failed to caputre.");
+
+                        tempRange = string.Format(@"${0}$98", column);
+                        string mserverName = xRange(tempRange);
+                        string AgentName = string.Format(@"{0}.{1}", mserverName, magentName);
+
+                        INSERT_Agent.Parameters.AddWithValue("@AgentName", AgentName);
+                        INSERT_Agent.Parameters.AddWithValue("@rlnFileName", xRequest.Element("xlname").Value);
+
+                        tempRange = string.Format(@"${0}$31", column);
+                        CellRange cell = new CellRange(tempRange);
+                        INSERT_Agent.Parameters.AddWithValue("@ApplyType", xCheck(cell.NextArea(2)));
+                        INSERT_Agent.Parameters.AddWithValue("@ChangePoint", xCheck(cell.NextArea(3)));
+                        INSERT_Agent.Parameters.AddWithValue("@SIer", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@ServerPIC", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@SystemID", xRange(cell.NextRow())); //7
+
+                        INSERT_Agent.Parameters.AddWithValue("@SystemName", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@SystemSubName", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@NetworkLocation", xCheck(cell.NextArea(2)));
+                        INSERT_Agent.Parameters.AddWithValue("@NetworkArea", xCheck(cell.NextArea(4))); //11
+
+                        INSERT_Agent.Parameters.AddWithValue("@ServerVIP", xRange(cell.NextRow(2)));
+                        INSERT_Agent.Parameters.AddWithValue("@ServerPRI", xRange(cell.NextRow(2)));
+                        INSERT_Agent.Parameters.AddWithValue("@ServerSEC", xRange(cell.NextRow(13))); //14
+
+                        INSERT_Agent.Parameters.AddWithValue("@MStMACommunicationPort", xRange(cell.NextRow(13)));
+                        INSERT_Agent.Parameters.AddWithValue("@MA_InstallDate", xDate(cell.NextRow())); //16
+
+                        INSERT_Agent.Parameters.AddWithValue("@MS_Connection", xDate(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@JobStartDate", xDate(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@JobCount", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@HasCallorder", xCheck(cell.NextArea(1)));
+
+                        INSERT_Agent.Parameters.AddWithValue("@HasFirewall", xCheck(cell.NextArea(1))); //21
+
+                        INSERT_Agent.Parameters.AddWithValue("@MA_Version", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@IsFirstTime", xCheck(cell.NextArea(1)));
+                        INSERT_Agent.Parameters.AddWithValue("@IsProduction", xCheck(cell.NextArea(1)));
+                        INSERT_Agent.Parameters.AddWithValue("@TestDoneDate", xDate(cell.NextRow())); //25
+
+                        INSERT_Agent.Parameters.AddWithValue("@CostFrom", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@CostFromSystemName", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@CostFromSubSystemName", xRange(cell.NextRow())); //28
+
+                        INSERT_Agent.Parameters.AddWithValue("@HasSundayJobs", xCheck(cell.NextArea(1)));
+                        INSERT_Agent.Parameters.AddWithValue("@HasRelatedSystems", xCheck(cell.NextArea(1)));
+                        INSERT_Agent.Parameters.AddWithValue("@RelatedSystemID", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@RelatedSystemName", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@RelatedSystemSubName", xRange(cell.NextRow()));
+
+
+                        INSERT_Agent.Parameters.AddWithValue("@RelatedSystemDatacenter", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@MAtMSCommunicationPort", xRange(cell.NextRow())); //30
+
+                        INSERT_Agent.Parameters.AddWithValue("@MSVIP", xRange(cell.NextRow())); 
+                        INSERT_Agent.Parameters.AddWithValue("@MSPRI", xRange(cell.NextRow()));
+                        INSERT_Agent.Parameters.AddWithValue("@MSSEC", xRange(cell.NextRow())); //33
+                        int RowsAffected = INSERT_Agent.ExecuteNonQuery();
+                        INSERT_Agent.Parameters.Clear();
+                        return RowsAffected;
+                        /*
+                         @AgentName, @rlnFileName, @ApplyType, @ChangePoint, @SIer, @ServerPIC,
+                         @SystemID, @SystemName, @SystemSubName, @NetworkLocation, @NetworkArea,
+                         @ServerVIP, @ServerPRI, @ServerSEC, @MStMACommunicationPort, @MA_InstallDate,
+                         @MS_Connection, @JobStartDate, @JobCount, @HasCallorder, @HasFirewall, @MA_Version,
+                         @IsFirstTime, @IsProduction, @TestDoneDate, @CostFrom, @CostFromSystemName,
+                         @CostFromSubSystemName, @HasSundayJobs, @HasRelatedSystems, @RelatedSystemID,
+                         @RelatedSystemName, @RelatedSystemSubName, @RelatedSystemDatacenter,
+                         @MAtMSCommunicationPort, @MSVIP, @MSPRI, @MSSEC 38
+                         */
+                    }
+                    // Sync the information of the new task
+                    // return values is rows affected
+                    int MakeCommandforExcel()
+                    {
+                        INSERT_Excel.CommandText = File.ReadAllText(SQLFolder + "INSERTExcel.sql");
+                        INSERT_Excel.Parameters.AddWithValue("@lname", xRequest.Element("xlname").Value);
+                        CellRange caStart = new CellRange("$H$7");
+                        string applydate = xRange(caStart.EndinRange());
+                        Debug.Print(applydate);
+                        INSERT_Excel.Parameters.AddWithValue("@ate_apply", DateTime.Parse(applydate));
+                        INSERT_Excel.Parameters.AddWithValue("@pplier", xRange(caStart.NextRow()));
+                        INSERT_Excel.Parameters.AddWithValue("@ailaddress", xRange(caStart.NextRow()));
+                        INSERT_Excel.Parameters.AddWithValue("@honenumber", xRange(caStart.NextRow()));
+                        INSERT_Excel.Parameters.AddWithValue("@pprover", xRange(caStart.NextRow()));
+                        INSERT_Excel.Parameters.AddWithValue("@obcon_accept", "陳 黙");
+                        INSERT_Excel.Parameters.AddWithValue("@obcon_confirm", "徐 長練");
+                        INSERT_Excel.Parameters.AddWithValue("@obcon_approve", "孫 紅莉");
+                        INSERT_Excel.Parameters.AddWithValue("@pecialcomment", xRange("$E$161"));
+                        Debug.Print("INSERT_Excel Parameters Count: {0}", INSERT_Excel.Parameters.Count);
+                        //Debug.Print(INSERT_Excel.CommandText);
+                        return INSERT_Excel.ExecuteNonQuery();
+                    }//(@lname, @ate_apply, @pplier, @ailaddress, @honenumber, @pprover, @obcon_accept, @obcon_confirm, @obcon_approve, @pecialcomment);
+
+                    if (MakeCommandForServer("$H$49") == 1 || MakeCommandForServer("$H$51") == 1 || MakeCommandForServer("$H$64") == 1)
+                    {
+                        MakeCommandforAgent('H');
                     }
 
-                    MakeCommandforMA("$H$49"); Debug.Print("Start Command 1");
-                    MakeCommandforMA("$H$51"); Debug.Print("Start Command 2");
-                    MakeCommandforMA("$H$64"); Debug.Print("Start Command 3");
-                    MakeCommandforMA("$L$49"); Debug.Print("Start Command 4");
-                    MakeCommandforMA("$L$51"); Debug.Print("Start Command 5");
-                    MakeCommandforMA("$L$64"); Debug.Print("Start Command 6");
-                    MakeCommandforMA("$P$49"); Debug.Print("Start Command 7");
-                    MakeCommandforMA("$P$51"); Debug.Print("Start Command 8");
-                    MakeCommandforMA("$P$64"); Debug.Print("Start Command 9");
+                    if (MakeCommandForServer("$L$49") == 1 || MakeCommandForServer("$L$51") == 1 || MakeCommandForServer("$L$64") == 1)
+                    {
+                        MakeCommandforAgent('L');
+                    }
+                    if (MakeCommandForServer("$P$49") == 1 || MakeCommandForServer("$P$51") == 1 || MakeCommandForServer("$P$64") == 1)
+                    {
+                        MakeCommandforAgent('P');
+                    }
+
+                    MakeCommandforExcel();
+
                     TransactAll.Commit();
                 }
 
@@ -479,8 +628,8 @@ namespace magentmanager
             {
                 Debug.Print(ex.Message);
             }*/
-        }
-    }
+                    }
+                }
 
 }
  
