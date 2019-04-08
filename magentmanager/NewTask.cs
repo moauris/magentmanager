@@ -308,7 +308,8 @@ namespace magentmanager
 
                         tempRange = string.Format(@"${0}$98", column);
                         string mserverName = xRange(tempRange);
-                        string AgentName = string.Format(@"{0}.{1}", mserverName, magentName);
+                        string AgentName = string.Format(@"{0}.{1}"
+                            , ControlMServer.Convert(mserverName), magentName);
 
                         INSERT_Agent.Parameters.AddWithValue("@AgentName", AgentName);
                         INSERT_Agent.Parameters.AddWithValue("@rlnFileName", xRequest.Element("xlname").Value);
@@ -613,23 +614,8 @@ namespace magentmanager
                     TransAll.Rollback();
                 }
             }
-
-            /*
-            string strSQL = File.ReadAllText(SQLFolder 
-                + "INSERTtbExcel.sql");
-            //Debug.Print(strSQL);
-
-            OleDbCommand INSERTrequest = new OleDbCommand(strSQL, conn);
-            try
-            {
-                INSERTrequest.ExecuteNonQuery();
-            }
-            catch(Exception ex)
-            {
-                Debug.Print(ex.Message);
-            }*/
-                    }
-                }
+        }
+    }
 
 }
  
