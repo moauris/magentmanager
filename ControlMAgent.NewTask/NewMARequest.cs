@@ -16,10 +16,11 @@ using System.Xml.Linq;
 using System.Xml;
 using ControlMAgent.Base;
 
-namespace magentmanager
+namespace ControlMAgent.NewTask
 {
-    class NewTask
+    public class NewMARequest
     {
+
         const string SQLFolder =
             @"C:\Users\MoChen\source\repos\magentmanager\magentmanager\database\";
         const string DatabaseSource = SQLFolder + "magentr.accdb";
@@ -35,15 +36,16 @@ namespace magentmanager
         }
 
         // Invoked to Allow user to select file(s) to sync.
-        internal static Task<FileInfo[]> TaskNewFileOpen()
+        public static Task<FileInfo[]> TaskNewFileOpen()
         {
             //throw new NotImplementedException();
             List<FileInfo> listFiles = new List<FileInfo>();
-            
+
             OpenFileDialog openFile = new OpenFileDialog
             {
                 Title = "同期したいな M/Agent 申請書を選択してください",
-                Multiselect = true, CheckFileExists = true,
+                Multiselect = true,
+                CheckFileExists = true,
                 DefaultExt = ".xlsx;.xls",
                 Filter = "Excel Worksheet (.xls;.xlsx)|*.xls;*xlsx"
             };
@@ -65,18 +67,18 @@ namespace magentmanager
         }
 
         //Sync Excel File to a XML.
-        internal static async void TaskExcelToDatabase
-            (FileInfo[] xlFiles, IProgress<bool> OnProgressChanged)
+        public static async void TaskExcelToDatabase
+            (FileInfo[] xlFiles, IProgress<double> OnProgressChanged)
         {
             //throw new NotImplementedException();
-            await Task.Run(() => OnProgressChanged.Report(true));
+            OnProgressChanged.Report(0);
 
             IEnumerable<Process> ieProcessExcelBefore =
                 from p in Process.GetProcessesByName("Excel")
                 select p;
 
-            EXCEL.Application xlApp = new EXCEL.Application();
-            EXCEL.Workbooks xlWorkbooks = xlApp.Workbooks;
+            EXCEL.Application xlApp = new EXCEL.Application();                  OnProgressChanged.Report(100);
+            EXCEL.Workbooks xlWorkbooks = xlApp.Workbooks;                      OnProgressChanged.Report(200);
             IEnumerable<Process> ieProcessExcelNew =
                 from p in Process.GetProcessesByName("Excel")
                 where !ieProcessExcelBefore.Contains(p)
@@ -84,23 +86,35 @@ namespace magentmanager
             Process CurrentExcelProcess = ieProcessExcelNew.First();
             Debug.Print("New Excel Proc ID: "
                 + CurrentExcelProcess.Id + " | "
-                + CurrentExcelProcess.ProcessName);
+                + CurrentExcelProcess.ProcessName);                             OnProgressChanged.Report(250);
 
             foreach (FileInfo f in xlFiles)
             {
                 //Before Opening, Check if same name has existed in Database.
-                bool ExcelIsNew = CheckDatabaseExcelExist(f.Name);
+                bool ExcelIsNew = CheckDatabaseExcelIsNew(f.Name);
                 if (ExcelIsNew)
                 {
                     EXCEL.Workbook xlWbk = xlWorkbooks.Open(f.FullName); //Opening Excel File
                     EXCEL.Worksheet xlSheet = xlWbk.ActiveSheet;
                     //Before Sync Starts, Check if Worksheet is a valid Request.
-                    ValidExcel validExcel = new ValidExcel(xlSheet);
+                    ValidateExcel validExcel = new ValidateExcel(xlSheet);
                     if (validExcel.IsValid)
                     {
                         try
                         {
+                            //Perform sync to database action when everything is validated.
                             await ExcelToXML(f, xlSheet);
+                            try
+                            {
+                                await XMLToDatabase();
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.Print(ex.StackTrace);
+                            }
+
+                           
+
                         }
                         catch (Exception ex)
                         {
@@ -111,6 +125,7 @@ namespace magentmanager
                     else
                     {
                         Debug.Print(validExcel.InvalidMessage);
+                        
                     }
 
                     xlWbk.Close(false, Missing.Value, Missing.Value);
@@ -121,22 +136,17 @@ namespace magentmanager
                     Debug.Print("File Already Existed: " + f.Name);
                 }
             }
-            xlWorkbooks.Close();
+            xlWorkbooks.Close();                                            OnProgressChanged.Report(800);
             xlApp.Quit();
             GC.Collect();
-            Console.Beep(1250, 20); Console.Beep(1650, 75);
-            await Task.Run(() => CurrentExcelProcess.Kill());
-
-            try
-            {
-                await XMLToDatabase();
-            }
-            catch(Exception ex)
-            {
-                Debug.Print(ex.StackTrace);
-            }
+            //Console.Beep(1050,  175);                                       
+            await Task.Run(() => CurrentExcelProcess.Kill());               OnProgressChanged.Report(900);
+            Debug.Print("TaskExcelToDatabase ENDED.");
+            OnProgressChanged.Report(1000);
+            await Task.Run(() => Console.Beep(1200, 375));
+            await Task.Delay(525);
+            OnProgressChanged.Report(0);
             
-            await Task.Run(() => OnProgressChanged.Report(false));
         }
 
         private static async Task XMLToDatabase()
@@ -239,7 +249,8 @@ namespace magentmanager
                     TransactAll = conn.BeginTransaction(IsolationLevel.ReadCommitted);
                     INSERT_Host.Connection = conn;
                     INSERT_Host.Transaction = TransactAll;
-                    INSERT_Excel = INSERT_Agent = INSERT_Host.Clone();
+                    INSERT_Agent = INSERT_Host.Clone();
+                    INSERT_Excel = INSERT_Host.Clone();
 
                     //Make 3 Commands, one for each column
                     //return value is rows affected.
@@ -276,7 +287,7 @@ namespace magentmanager
                                 INSERT_Host.Parameters.AddWithValue("@ersion", xRange(caStart.NextRow()));
                                 INSERT_Host.Parameters.AddWithValue("@itVal", xRange(caStart.NextRow()));
                                 INSERT_Host.Parameters.AddWithValue("@lusterBox", xRange(caStart.NextRow()));
-                                INSERT_Host.Parameters.AddWithValue("@lusterIndex", xRange(caStart.NextRow())); 
+                                INSERT_Host.Parameters.AddWithValue("@lusterIndex", xRange(caStart.NextRow()));
 
                             }
                             //Debug.Print("Parameters Before Clear: {0}", INSERT_Host.Parameters.Count);
@@ -303,7 +314,7 @@ namespace magentmanager
                         tempRange = string.Format(@"${0}$51", column);
                         if (ValidHostname.IsMatch(xRange(tempRange)))
                             magentName = xRange(tempRange);
-                        if(magentName == "")
+                        if (magentName == "")
                             throw new Exception("Invalid MA Column, magentName Failed to caputre.");
 
                         tempRange = string.Format(@"${0}$98", column);
@@ -360,7 +371,7 @@ namespace magentmanager
                         INSERT_Agent.Parameters.AddWithValue("@RelatedSystemDatacenter", xRange(cell.NextRow()));
                         INSERT_Agent.Parameters.AddWithValue("@MAtMSCommunicationPort", xRange(cell.NextRow())); //30
 
-                        INSERT_Agent.Parameters.AddWithValue("@MSVIP", xRange(cell.NextRow())); 
+                        INSERT_Agent.Parameters.AddWithValue("@MSVIP", xRange(cell.NextRow()));
                         INSERT_Agent.Parameters.AddWithValue("@MSPRI", xRange(cell.NextRow()));
                         INSERT_Agent.Parameters.AddWithValue("@MSSEC", xRange(cell.NextRow())); //33
                         int RowsAffected = INSERT_Agent.ExecuteNonQuery();
@@ -479,14 +490,14 @@ namespace magentmanager
 
             //Debug.Print(xeRoot.ToString());
             File.WriteAllText("Request_Definition.xml", xeRoot.ToString());
-            Debug.Print ("File written Request_Definition.xml.");
+            Debug.Print("File written Request_Definition.xml.");
             //Perfect, it gets the Values.
         }
 
         //
         // Summary:
         //     Check if a Request already existed in the database.
-        private static bool CheckDatabaseExcelExist(string name)
+        private static bool CheckDatabaseExcelIsNew(string name)
         {
             //throw new NotImplementedException();
             var Conn = DatabaseConnection();
@@ -528,14 +539,14 @@ namespace magentmanager
                     //Otherwise it throws the connection waiting for a local Transaction error
                     INSERT_Host.Connection = conn;
                     INSERT_Host.Transaction = TransAll;
-                    Regex ValidHostname = 
+                    Regex ValidHostname =
                         new Regex(@"(\w|\d){8,}\.?");
                     //Is there Value to be synced at H49:K50, VIP, C1
                     string C1VIP = xlSheet.Range["$H$49"].Value;
                     Match mhValidHost = ValidHostname.Match(C1VIP);
                     if (mhValidHost.Success)
                     {
-                        INSERT_Host.CommandText =File.ReadAllText(SQLFolder + "INSERTHost.sql");
+                        INSERT_Host.CommandText = File.ReadAllText(SQLFolder + "INSERTHost.sql");
                         INSERT_Host.Parameters.AddWithValue("@ostname", C1VIP);
                     }
                     string C2VIP = xlSheet.Range["$L$49"].Value;
@@ -604,11 +615,11 @@ namespace magentmanager
                     Debug.Print("Sync Completed.");
 
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
 
                     Debug.Print("An Error Happened, Rolling Back.");
-                    
+
                     Debug.Print(ex.Message);
                     Debug.Print(ex.StackTrace);
                     TransAll.Rollback();
@@ -618,4 +629,3 @@ namespace magentmanager
     }
 
 }
- 

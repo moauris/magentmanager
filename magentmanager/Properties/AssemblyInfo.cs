@@ -8,9 +8,9 @@ using System.Windows;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("magentmanager")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("ControlMAgent Manager, a WPF application that manages MAgent Related Requests")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("IBM LISA")]
 [assembly: AssemblyProduct("magentmanager")]
 [assembly: AssemblyCopyright("Copyright ©  2019")]
 [assembly: AssemblyTrademark("")]

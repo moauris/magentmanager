@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="ジョブコン Control/M-Agent依頼管理運用 ツール" Height="450" Width="800">
     <Grid>
-        <Grid.RowDefinitions>
+        <Grid.RowDefinitions>  
             <RowDefinition Height="10*"/>
             <RowDefinition Height="11*"/>
             <RowDefinition Height="58*"/>
@@ -20,7 +20,7 @@
         </Grid.ColumnDefinitions>
         <Button x:Name="btnNewRequest"
                 Grid.Row="1" Grid.Column="1"
-                Margin="4,4.4,4,3.8"
+                Margin="4,4,4,4"
                 Click="btnNewRequest_Clicked">
             新規依頼受付
         </Button>
@@ -38,7 +38,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                     </Grid>
-                    
+
                 </ItemsPanelTemplate>
             </StatusBar.ItemsPanel>
             <StatusBarItem x:Name="sbarTextBox" Content="Status: Ready." Grid.Column="0"/>

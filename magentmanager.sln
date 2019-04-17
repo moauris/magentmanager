@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "magentmanager", "magentmana
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlMAgent.Base", "..\ControlMAgent.Base\ControlMAgent.Base\ControlMAgent.Base.csproj", "{27205917-DF7E-4438-A8A2-0752FB107902}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlMAgent.NewTask", "ControlMAgent.NewTask\ControlMAgent.NewTask.csproj", "{C6BDEB94-EC3F-4FB9-AE13-98043D125D40}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlMAgent.CCM", "ControlMAgent.CCM\ControlMAgent.CCM.csproj", "{316173D5-B7DC-4B02-863F-AE699B5E2395}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{27205917-DF7E-4438-A8A2-0752FB107902}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{27205917-DF7E-4438-A8A2-0752FB107902}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{27205917-DF7E-4438-A8A2-0752FB107902}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6BDEB94-EC3F-4FB9-AE13-98043D125D40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6BDEB94-EC3F-4FB9-AE13-98043D125D40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6BDEB94-EC3F-4FB9-AE13-98043D125D40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6BDEB94-EC3F-4FB9-AE13-98043D125D40}.Release|Any CPU.Build.0 = Release|Any CPU
+		{316173D5-B7DC-4B02-863F-AE699B5E2395}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{316173D5-B7DC-4B02-863F-AE699B5E2395}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{316173D5-B7DC-4B02-863F-AE699B5E2395}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{316173D5-B7DC-4B02-863F-AE699B5E2395}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
